@@ -2,9 +2,9 @@ package mqtt
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
+	log "github.com/sirupsen/logrus"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/trivago/gollum/core"
@@ -16,9 +16,11 @@ type MqttConsumer struct {
 	topic            string
 	client           mqtt.Client
 	clientId         string
+	Log		 *log.Logger
 }
 
 func init() {
+	
 	core.TypeRegistry.Register(MqttConsumer{})
 }
 
@@ -27,19 +29,19 @@ func (cons *MqttConsumer) messageHandler(_ mqtt.Client, msg mqtt.Message) {
 }
 
 func (cons *MqttConsumer) connectionHandler(client mqtt.Client) {
-	cons.Log.Debug.Printf("Connected to MQTT Server: %s. Listening to topic %s", cons.connectionString, cons.topic)
+	cons.Log.Debug("Connected to MQTT Server: %s. Listening to topic %s", cons.connectionString, cons.topic)
 	token := client.Subscribe(cons.topic, 0, cons.messageHandler)
 	token.Wait()
 	err := token.Error()
 	if err != nil {
-		cons.Log.Error.Printf("Error Subsribing to topic %q: %s", cons.topic, err)
+		cons.Log.Error("Error Subsribing to topic %q: %s", cons.topic, err)
 		time.AfterFunc(3*time.Second, cons.startConnection)
 		return
 	}
 }
 
 func (cons *MqttConsumer) startConnection() {
-	cons.Log.Debug.Printf("Connecting to MQTT Server: %s", cons.connectionString)
+	cons.Log.Debug("Connecting to MQTT Server: %s", cons.connectionString)
 	clientOptions := mqtt.NewClientOptions()
 	clientOptions.ClientID = cons.clientId
 	clientOptions.AddBroker(cons.connectionString)
@@ -50,7 +52,7 @@ func (cons *MqttConsumer) startConnection() {
 }
 
 func (cons *MqttConsumer) connectionLostHandler(client mqtt.Client, err error) {
-	cons.Log.Error.Printf("Disconnected from MQTT Server: %s. Will try to Auto_reconnect", err)
+	cons.Log.Error("Disconnected from MQTT Server: %s. Will try to Auto_reconnect", err)
 }
 
 func (cons *MqttConsumer) startListening() {
@@ -67,12 +69,13 @@ func (cons *MqttConsumer) Configure(conf core.PluginConfigReader) error {
 	cons.topic = conf.GetString("topic", "#")
 	quietPeriod := uint(conf.GetInt("quietPeriod", 200))
 
+	/*
 	if os.Getenv("MQTT_ENABLE_LOGGING") == "true" {
 		mqtt.DEBUG = cons.Log.Debug
 		mqtt.WARN = cons.Log.Warning
 		mqtt.CRITICAL = cons.Log.Error
 		mqtt.ERROR = cons.Log.Error
-	}
+	}*/
 	cons.SetStopCallback(func() {
 		if cons.client != nil {
 			cons.client.Disconnect(quietPeriod)
